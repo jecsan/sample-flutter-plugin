@@ -8,7 +8,9 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 
@@ -27,46 +29,42 @@ class PluginSamplePlugin : FlutterPlugin, MethodCallHandler {
 
     override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: Result) {
         if (call.method == "getPlatformVersion") {
-           result.success("Android ${android.os.Build.VERSION.RELEASE}")
+            result.success("Android ${android.os.Build.VERSION.RELEASE}")
 
             val validation = object : Validation {
-                override fun validate(value: String): Boolean {
+                override suspend fun validate(value: String): Boolean {
 
                     Log.d("Validation", "Validating $value from Android")
 
-                    val validationResult =
-                        runBlocking {
-                        return@runBlocking suspendCoroutine<Boolean> {
-                            channel.invokeMethod("validate", value, object : MethodChannel.Result {
-                                override fun success(p0: Any?) {
-                                    Log.d("Validation Result", "$p0")
-                                    it.resume(p0 as Boolean)
+                    return suspendCoroutine<Boolean> {
+                        channel.invokeMethod("validate", value, object : MethodChannel.Result {
+                            override fun success(p0: Any?) {
+                                Log.d("Validation Result", "From invoke method:$p0")
+                                it.resume(p0 as Boolean)
 
-                                }
+                            }
 
-                                override fun error(p0: String, p1: String?, p2: Any?) {
-                                    Log.d("Validation Result", "Error $p0")
+                            override fun error(p0: String, p1: String?, p2: Any?) {
+                                Log.d("Validation Result", "Error $p0")
 
-                                }
+                            }
 
-                                override fun notImplemented() {
-                                    Log.d("Validation Result", "Not implemented")
+                            override fun notImplemented() {
+                                Log.d("Validation Result", "Not implemented")
 
-                                }
+                            }
 
-                            })
-                        }
+                        })
                     }
 
-                    Log.d("Validation", "Validation completed, result = $validationResult")
-
-
-                    return validationResult
                 }
 
             }
 
-            validation.validate("Sample Input")
+            CoroutineScope(Dispatchers.Main).launch {
+                val validationResult = validation.validate("Sample Input")
+                Log.d("Validation","Input validated: $validationResult")
+            }
 
 
         } else {
@@ -81,5 +79,5 @@ class PluginSamplePlugin : FlutterPlugin, MethodCallHandler {
 
 
 interface Validation {
-    fun validate(value: String): Boolean
+    suspend fun validate(value: String): Boolean
 }
